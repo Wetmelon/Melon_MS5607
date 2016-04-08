@@ -1,9 +1,10 @@
 /***************************************************************************
 This is a library for the MS5607-02BA03 barometric pressure sensor
 
-These sensors use I2C or SPI to communicate.
+These sensors use I2C or SPI to communicate, though only I2C is implemented
 
 Written by Paul Guenette
+Apr 8, 2016
 
 MIT License
 ***************************************************************************/
@@ -27,7 +28,7 @@ MIT License
 #endif
 
 
-
+// Oversampling rates
 enum
 {
     MS5607_OSR256   = 0x00,
@@ -40,17 +41,14 @@ enum
 class Melon_MS5607
 {
 public:
-
-
-
     Melon_MS5607(void);
     bool begin(uint8_t addr);
     void reset();
     void printCalibData();
     void setOversamplingRate(uint8_t rate);
 
-    double getTemperature();
-    double getPressure();
+    double getTemperature();                 // Returns the temperature, in Celsius, as a double
+    double getPressure();                    // Returns the pressure, in mbar, as a double
 
     uint32_t getCompensatedTemperature();    // Returns the 24-bit fixed-point value directly from the MS5607
     uint32_t getCompensatedPressure();       // Returns the 24-bit fixed-point value directly from the MS5607
@@ -58,9 +56,9 @@ public:
 
 private:
 
-    /*=========================================================================
-    COMMANDS
-    -----------------------------------------------------------------------*/
+/*=========================================================================
+COMMANDS
+-----------------------------------------------------------------------*/
     enum MS5607_CMD
     {
         MS5607_RESET                = 0x1E,
@@ -74,8 +72,12 @@ private:
         MS5607_PROM_READ_C5         = 0xAA,
         MS5607_PROM_READ_C6         = 0xAC
     };
+/*=========================================================================*/
 
 
+/*=========================================================================
+    CALIBRATION DATA
+    -----------------------------------------------------------------------*/
     typedef struct 
     {
         uint16_t C1 = 0;            // C1 - Pressure Sensitivity
@@ -85,7 +87,8 @@ private:
         uint16_t C5 = 0;            // C5 - Reference temperature
         uint16_t C6 = 0;            // C6 - Temperature coefficient of the temperature
     } ms5607_calibration;
-
+/*=========================================================================*/
+    
     ms5607_calibration _calibData;
 
     // Actual values
@@ -98,8 +101,6 @@ private:
     int32_t P = 0;
 
     uint8_t _i2caddr;
-
-    
     uint8_t _oversamplingRate = MS5607_OSR256;
     uint8_t _osrdelay = 1;  // 1ms delay for OSR256
 

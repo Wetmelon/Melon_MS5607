@@ -1,14 +1,13 @@
 /***************************************************************************
 This is a library for the MS5607-02BA03 barometric pressure sensor
 
-These sensors use I2C or SPI to communicate.
+These sensors use I2C or SPI to communicate, though only I2C is implemented
 
 Written by Paul Guenette
+Apr 8, 2016
 
 MIT License
 ***************************************************************************/
-
-
 
 #include "Melon_MS5607.h"
 
@@ -26,8 +25,6 @@ MIT License
 #else
 #include <Wire.h>
 #endif
-
-#define SENS_CONV (8388608)     // 2^23, or 8388608
 
 Melon_MS5607::Melon_MS5607(void){
     // i2c
@@ -50,16 +47,6 @@ bool Melon_MS5607::begin(uint8_t addr)
     return true;
 }
 
-/* Reads the PROM from the MS5607 and stores the values into a struct */
-void Melon_MS5607::getCalibrationData(ms5607_calibration &calib){
-    calib.C1 = read16(MS5607_PROM_READ_C1);
-    calib.C2 = read16(MS5607_PROM_READ_C2);
-    calib.C3 = read16(MS5607_PROM_READ_C3);
-    calib.C4 = read16(MS5607_PROM_READ_C4);
-    calib.C5 = read16(MS5607_PROM_READ_C5);
-    calib.C6 = read16(MS5607_PROM_READ_C6);
-}
-
 /* Get the compensated temperature as a floating point value, in °C */
 double Melon_MS5607::getTemperature(){
     getCompensatedTemperature();
@@ -72,6 +59,68 @@ double Melon_MS5607::getPressure(){
     getCompensatedPressure();                   
     return P / 100.0;
 }
+
+void Melon_MS5607::setOversamplingRate(uint8_t rate){
+    _oversamplingRate = rate;
+    
+    // Set the delay between conversion and ADC read to a value
+    // just above the max conversion time for each oversampling rate
+    switch (rate)
+    {
+    case 0:
+        _osrdelay = 1;
+        break;
+    case 2:
+        _osrdelay = 2;
+        break;
+    case 4:
+        _osrdelay = 3;
+        break;
+    case 6:
+        _osrdelay = 5;
+        break;
+    case 8:
+        _osrdelay = 10;
+        break;
+    }
+}
+
+/* Write the reset command to the MS5607 */
+void Melon_MS5607::reset(){
+    write8(MS5607_RESET);
+}
+
+/* Prints off the values stored in _calibdata */
+void Melon_MS5607::printCalibData(){
+    Serial.print("C1: ");
+    Serial.println(_calibData.C1);
+    Serial.print("C2: ");
+    Serial.println(_calibData.C2);
+    Serial.print("C3: ");
+    Serial.println(_calibData.C3);
+    Serial.print("C4: ");
+    Serial.println(_calibData.C4);
+    Serial.print("C5: ");
+    Serial.println(_calibData.C5);
+    Serial.print("C6: ");
+    Serial.println(_calibData.C6);
+}
+
+/***************************************************************************
+ PRIVATE FUNCTIONS
+ ***************************************************************************/
+ 
+/* Reads the PROM from the MS5607 and stores the values into a struct */
+void Melon_MS5607::getCalibrationData(ms5607_calibration &calib){
+    calib.C1 = read16(MS5607_PROM_READ_C1);
+    calib.C2 = read16(MS5607_PROM_READ_C2);
+    calib.C3 = read16(MS5607_PROM_READ_C3);
+    calib.C4 = read16(MS5607_PROM_READ_C4);
+    calib.C5 = read16(MS5607_PROM_READ_C5);
+    calib.C6 = read16(MS5607_PROM_READ_C6);
+}
+
+
 
 /* Run the 2nd order compensation tree (see datasheet) */
 void Melon_MS5607::compensateSecondOrder()
@@ -105,7 +154,7 @@ uint32_t Melon_MS5607::getCompensatedTemperature(){
 
     // Compensate for calibration data
     dT =  D2 - ((int32_t)_calibData.C5 * 256);                       // D2 - T_ref
-    TEMP = 2000 + (dT*(int32_t)_calibData.C6) / SENS_CONV;           // 20.00°C + dT * TEMPSENS
+    TEMP = 2000 + (dT*(int32_t)_calibData.C6) / 8388608;           // 20.00°C + dT * TEMPSENS
 
     return TEMP;
 }
@@ -128,31 +177,6 @@ uint32_t Melon_MS5607::getCompensatedPressure(){
     P = ((D1 * (SENS / (2 << 20))) - OFF) / (2 << 14);              // P = (D1 * SENS / 2^21 - OFF) / 2^15
 
     return P;
-}
-
-void Melon_MS5607::setOversamplingRate(uint8_t rate){
-    _oversamplingRate = rate;
-    
-    // Set the delay between conversion and ADC read to a value
-    // just above the max conversion time for each oversampling rate
-    switch (rate)
-    {
-    case 0:
-        _osrdelay = 1;
-        break;
-    case 2:
-        _osrdelay = 2;
-        break;
-    case 4:
-        _osrdelay = 3;
-        break;
-    case 6:
-        _osrdelay = 5;
-        break;
-    case 8:
-        _osrdelay = 10;
-        break;
-    }
 }
 
 /* Reads an 8-bit unsigned integer from the MS5607 */
@@ -204,23 +228,3 @@ void Melon_MS5607::write8(uint8_t value){
     Wire.endTransmission();
 }
 
-/* Write the reset command to the MS5607 */
-void Melon_MS5607::reset(){
-    write8(MS5607_RESET);
-}
-
-/* Prints off the values stored in _calibdata */
-void Melon_MS5607::printCalibData(){
-    Serial.print("C1: ");
-    Serial.println(_calibData.C1);
-    Serial.print("C2: ");
-    Serial.println(_calibData.C2);
-    Serial.print("C3: ");
-    Serial.println(_calibData.C3);
-    Serial.print("C4: ");
-    Serial.println(_calibData.C4);
-    Serial.print("C5: ");
-    Serial.println(_calibData.C5);
-    Serial.print("C6: ");
-    Serial.println(_calibData.C6);
-}
