@@ -29,14 +29,14 @@ MIT License
 
 
 // Oversampling rates
-enum
+typedef enum
 {
     MS5607_OSR256   = 0x00,
     MS5607_OSR512   = 0x02,
     MS5607_OSR1024  = 0x04,
     MS5607_OSR2048  = 0x06,
     MS5607_OSR4096  = 0x08
-};
+} ms5607_osr;
 
 class Melon_MS5607
 {
@@ -50,8 +50,8 @@ public:
     double getTemperature();                 // Returns the temperature, in Celsius, as a double
     double getPressure();                    // Returns the pressure, in mbar, as a double
 
-    uint32_t getCompensatedTemperature();    // Returns the 24-bit fixed-point value directly from the MS5607
-    uint32_t getCompensatedPressure();       // Returns the 24-bit fixed-point value directly from the MS5607
+    int32_t getCompensatedTemperature();    // Returns the 24-bit fixed-point value directly from the MS5607
+    int32_t getCompensatedPressure();       // Returns the 24-bit fixed-point value directly from the MS5607
     
 
 private:

@@ -141,13 +141,13 @@ void Melon_MS5607::compensateSecondOrder()
             SENS2 += 8 * (TEMP + 1500)*(TEMP + 1500);       // SENS2 = SENS2 + 8 * (TEMP + 1500)^2
         }
         TEMP = TEMP - T2;
-        OFF = TEMP - OFF2;
+        OFF = OFF - OFF2;
         SENS = SENS - SENS2;
     }
 }
 
 /* Returns temperature compensated temperature values */
-uint32_t Melon_MS5607::getCompensatedTemperature(){
+int32_t Melon_MS5607::getCompensatedTemperature(){
     write8(MS5607_CONVERT_D2 + _oversamplingRate);          // Start a temperature conversion with the specified oversampling rate
     delay(_osrdelay);                                       // Wait for conversion to finish
     D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
@@ -160,7 +160,7 @@ uint32_t Melon_MS5607::getCompensatedTemperature(){
 }
 
 /* Returns temperature compensated pressure values */
-uint32_t Melon_MS5607::getCompensatedPressure(){
+int32_t Melon_MS5607::getCompensatedPressure(){
     write8(MS5607_CONVERT_D1 + _oversamplingRate);          // Start a pressure conversion with the speciifed oversampling rate
     delay(_osrdelay);                                       // Wait for conversion to finish
     D1 = read24(MS5607_ADC_READ);                           // Read and store the Digital pressure value
