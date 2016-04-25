@@ -94,14 +94,14 @@ COMMANDS
     // Actual values
     uint32_t D1 = 0;
     uint32_t D2 = 0;
-    int32_t dT = 0;
+    int64_t dT = 0;
     int32_t TEMP = 0;
     int64_t OFF = 0;
     int64_t SENS = 0;
     int32_t P = 0;
 
     uint8_t _i2caddr;
-    uint8_t _oversamplingRate = MS5607_OSR256;
+    uint8_t _oversamplingRate = MS5607_OSR512;
     uint8_t _osrdelay = 1;  // 1ms delay for OSR256
 
     void compensateSecondOrder();

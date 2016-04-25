@@ -44,6 +44,7 @@ bool Melon_MS5607::begin(uint8_t addr)
     delay(20);
 
     this->getCalibrationData(_calibData);
+    printCalibData();
     return true;
 }
 
@@ -54,7 +55,7 @@ double Melon_MS5607::getTemperature(){
     return TEMP / 100.0;            // TEMP is a fixed-point int - 2000 = 20.00°C
 }
 
-/* Get the compensated pressure as a floating point value, in °C */
+/* Get the compensated pressure as a floating point value, in mbar */
 double Melon_MS5607::getPressure(){
     getCompensatedPressure();                   
     return P / 100.0;
@@ -120,8 +121,6 @@ void Melon_MS5607::getCalibrationData(ms5607_calibration &calib){
     calib.C6 = read16(MS5607_PROM_READ_C6);
 }
 
-
-
 /* Run the 2nd order compensation tree (see datasheet) */
 void Melon_MS5607::compensateSecondOrder()
 {
@@ -131,7 +130,7 @@ void Melon_MS5607::compensateSecondOrder()
 
     // Low Temperature
     if (TEMP < 2000){
-        T2 = ((dT * dT) / (2 << 30));                       // T2 = dT^2 / 2^31
+        T2 = ((dT * dT) / (1 << 31));                       // T2 = dT^2 / 2^31
         OFF2 = 61 * (TEMP - 2000)*(TEMP - 2000) / 16;       // OFF2 = 61 * (TEMP-2000)^2 / 2^4
         SENS2 = 2 * (TEMP - 2000)*(TEMP - 2000);            // SENS2 = 2 * (TEMP-2000)^2
 
@@ -153,8 +152,8 @@ int32_t Melon_MS5607::getCompensatedTemperature(){
     D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
 
     // Compensate for calibration data
-    dT =  D2 - ((int32_t)_calibData.C5 * 256);                       // D2 - T_ref
-    TEMP = 2000 + (dT*(int32_t)_calibData.C6) / 8388608;           // 20.00°C + dT * TEMPSENS
+    dT =  D2 - ((uint32_t)_calibData.C5 << 8);                       // D2 - T_ref
+    TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00°C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
 
     return TEMP;
 }
@@ -165,16 +164,15 @@ int32_t Melon_MS5607::getCompensatedPressure(){
     delay(_osrdelay);                                       // Wait for conversion to finish
     D1 = read24(MS5607_ADC_READ);                           // Read and store the Digital pressure value
 
-
     // Compensate for calibration data
     getCompensatedTemperature();
 
-    OFF = ((int32_t)_calibData.C2 * (131072)) + (((int32_t)_calibData.C4 * dT) / 64);    // OFF = OFF_t1 + TCO * dT  or  OFF = C2 * 2^17 + (C4 * dT) / 2^6
-    SENS = ((int32_t)_calibData.C1 * (32768)) + (((int32_t)_calibData.C3 * dT) / 128);  // SENS = SENS_t1 + TCS * dT or SENS = C1 * 2^16 + (C3 * dT) / 2^7
+    OFF = ((int64_t)_calibData.C2 << 17) + ((dT * _calibData.C4) >> 6);    // OFF = OFF_t1 + TCO * dT  or  OFF = C2 * 2^17 + (C4 * dT) / 2^6
+    SENS = ((int64_t)_calibData.C1 << 16) + ((dT * _calibData.C3) >> 7);  // SENS = SENS_t1 + TCS * dT or SENS = C1 * 2^16 + (C3 * dT) / 2^7
 
     compensateSecondOrder();
 
-    P = ((D1 * (SENS / (2 << 20))) - OFF) / (2 << 14);              // P = (D1 * SENS / 2^21 - OFF) / 2^15
+    P = ((int64_t)D1 * (SENS >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
 
     return P;
 }
