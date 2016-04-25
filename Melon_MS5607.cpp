@@ -129,8 +129,8 @@ void Melon_MS5607::compensateSecondOrder()
 
     // Low Temperature
     if (TEMP < 2000){
-        T2 = ((dT * dT) / (1 << 31));                       // T2 = dT^2 / 2^31
-        OFF2 = 61 * (TEMP - 2000)*(TEMP - 2000) / 16;       // OFF2 = 61 * (TEMP-2000)^2 / 2^4
+        T2 = ((dT * dT) >> 31);                       // T2 = dT^2 / 2^31
+        OFF2 = 61 * (TEMP - 2000)*(TEMP - 2000) >> 4;       // OFF2 = 61 * (TEMP-2000)^2 / 2^4
         SENS2 = 2 * (TEMP - 2000)*(TEMP - 2000);            // SENS2 = 2 * (TEMP-2000)^2
 
         // Very Low Temperature
