@@ -101,7 +101,7 @@ COMMANDS
     int32_t P = 0;
 
     uint8_t _i2caddr;
-    uint8_t _oversamplingRate = MS5607_OSR512;
+    uint8_t _oversamplingRate = MS5607_OSR256;
     uint8_t _osrdelay = 1;  // 1ms delay for OSR256
 
     void compensateSecondOrder();

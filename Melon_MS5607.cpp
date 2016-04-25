@@ -44,7 +44,6 @@ bool Melon_MS5607::begin(uint8_t addr)
     delay(20);
 
     this->getCalibrationData(_calibData);
-    printCalibData();
     return true;
 }
 
