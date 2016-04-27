@@ -47,12 +47,14 @@ public:
     void printCalibData();
     void setOversamplingRate(uint8_t rate);
 
-    double getTemperature();                 // Returns the temperature, in Celsius, as a double
-    double getPressure();                    // Returns the pressure, in mbar, as a double
-
-    int32_t getCompensatedTemperature();    // Returns the 24-bit fixed-point value directly from the MS5607
-    int32_t getCompensatedPressure();       // Returns the 24-bit fixed-point value directly from the MS5607
+    int32_t getTemperature();                 // Returns the temperature, in Celsius, as a double
+    int32_t getPressure();                    // Returns the pressure, in mbar, as a double
     
+    bool startTemperatureConversion();
+    bool startPressureConversion();
+
+    bool readTemperature();
+    bool readPressure();
 
 private:
 
@@ -102,10 +104,13 @@ COMMANDS
 
     uint8_t _i2caddr;
     uint8_t _oversamplingRate = MS5607_OSR256;
-    uint8_t _osrdelay = 1;  // 1ms delay for OSR256
+    uint32_t _osrdelay = 1000;  // 1ms delay for OSR256
+    uint32_t _lastConversion;
 
     void compensateSecondOrder();
     void getCalibrationData(ms5607_calibration &calib);
+    void setDelay();
+
     void write8(uint8_t val);
     uint8_t read8(uint8_t reg);
     uint16_t read16(uint8_t reg);

@@ -44,43 +44,70 @@ bool Melon_MS5607::begin(uint8_t addr)
     delay(20);
 
     this->getCalibrationData(_calibData);
+    setDelay();
+    _lastConversion = 0;
+
+    startTemperatureConversion();
+    delayMicroseconds(_osrdelay);
+
+    startPressureConversion();
+    delayMicroseconds(_osrdelay);
     return true;
 }
 
 /* Get the compensated temperature as a floating point value, in °C */
-double Melon_MS5607::getTemperature(){
-    getCompensatedTemperature();
-    compensateSecondOrder();
-    return TEMP / 100.0;            // TEMP is a fixed-point int - 2000 = 20.00°C
+int32_t Melon_MS5607::getTemperature(){
+    return TEMP;            // TEMP is a fixed-point int - 2000 = 20.00°C
 }
 
 /* Get the compensated pressure as a floating point value, in mbar */
-double Melon_MS5607::getPressure(){
-    getCompensatedPressure();                   
-    return P / 100.0;
+int32_t Melon_MS5607::getPressure(){  
+    return P;
+}
+
+bool Melon_MS5607::startTemperatureConversion(){
+    if (micros() - _lastConversion > _osrdelay){
+        write8(MS5607_CONVERT_D2 + _oversamplingRate);          // Start a temperature conversion with the specified oversampling rate
+        setDelay();
+        _lastConversion = micros();
+        return true;
+    }
+    return false;
+}
+
+bool Melon_MS5607::startPressureConversion(){
+    if (micros() - _lastConversion > _osrdelay){
+        write8(MS5607_CONVERT_D1 + _oversamplingRate);          // Start a pressure conversion with the speciifed oversampling rate
+        setDelay();
+        _lastConversion = micros();
+        return true;
+    }
+    return false;
 }
 
 void Melon_MS5607::setOversamplingRate(uint8_t rate){
     _oversamplingRate = rate;
-    
+}
+
+void Melon_MS5607::setDelay(){
     // Set the delay between conversion and ADC read to a value
     // just above the max conversion time for each oversampling rate
-    switch (rate)
+    switch (_oversamplingRate)
     {
     case 0:
-        _osrdelay = 1;
+        _osrdelay = 750;
         break;
     case 2:
-        _osrdelay = 2;
+        _osrdelay = 1250;
         break;
     case 4:
-        _osrdelay = 3;
+        _osrdelay = 2500;
         break;
     case 6:
-        _osrdelay = 5;
+        _osrdelay = 4750;
         break;
     case 8:
-        _osrdelay = 10;
+        _osrdelay = 9250;
         break;
     }
 }
@@ -120,6 +147,33 @@ void Melon_MS5607::getCalibrationData(ms5607_calibration &calib){
     calib.C6 = read16(MS5607_PROM_READ_C6);
 }
 
+/* Read the ADC, store it into D2, and calculate TEMP from calibration data and D1 */
+bool Melon_MS5607::readTemperature(){
+    if (micros() - _lastConversion > _osrdelay){
+        D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
+        // Compensate for calibration data
+        dT = D2 - ((uint32_t)_calibData.C5 << 8);                    // D2 - T_ref
+        TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00°C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
+        return true;
+    }
+    else
+        return false;
+}
+
+bool Melon_MS5607::readPressure(){
+    if (micros() - _lastConversion > _osrdelay){
+        D1 = read24(MS5607_ADC_READ);                           // Read and store the Digital pressure value
+        OFF = ((int64_t)_calibData.C2 << 17) + ((dT * _calibData.C4) >> 6);    // OFF = OFF_t1 + TCO * dT  or  OFF = C2 * 2^17 + (C4 * dT) / 2^6
+        SENS = ((int64_t)_calibData.C1 << 16) + ((dT * _calibData.C3) >> 7);  // SENS = SENS_t1 + TCS * dT or SENS = C1 * 2^16 + (C3 * dT) / 2^7
+
+        compensateSecondOrder();
+        P = ((int64_t)D1 * (SENS >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
+        return true;
+    }
+    else
+        return false;
+}
+
 /* Run the 2nd order compensation tree (see datasheet) */
 void Melon_MS5607::compensateSecondOrder()
 {
@@ -144,37 +198,10 @@ void Melon_MS5607::compensateSecondOrder()
     }
 }
 
-/* Returns temperature compensated temperature values */
-int32_t Melon_MS5607::getCompensatedTemperature(){
-    write8(MS5607_CONVERT_D2 + _oversamplingRate);          // Start a temperature conversion with the specified oversampling rate
-    delay(_osrdelay);                                       // Wait for conversion to finish
-    D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
 
-    // Compensate for calibration data
-    dT =  D2 - ((uint32_t)_calibData.C5 << 8);                       // D2 - T_ref
-    TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00°C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
-
-    return TEMP;
-}
-
-/* Returns temperature compensated pressure values */
-int32_t Melon_MS5607::getCompensatedPressure(){
-    write8(MS5607_CONVERT_D1 + _oversamplingRate);          // Start a pressure conversion with the speciifed oversampling rate
-    delay(_osrdelay);                                       // Wait for conversion to finish
-    D1 = read24(MS5607_ADC_READ);                           // Read and store the Digital pressure value
-
-    // Compensate for calibration data
-    getCompensatedTemperature();
-
-    OFF = ((int64_t)_calibData.C2 << 17) + ((dT * _calibData.C4) >> 6);    // OFF = OFF_t1 + TCO * dT  or  OFF = C2 * 2^17 + (C4 * dT) / 2^6
-    SENS = ((int64_t)_calibData.C1 << 16) + ((dT * _calibData.C3) >> 7);  // SENS = SENS_t1 + TCS * dT or SENS = C1 * 2^16 + (C3 * dT) / 2^7
-
-    compensateSecondOrder();
-
-    P = ((int64_t)D1 * (SENS >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
-
-    return P;
-}
+/***************************************************************************
+* i2c Communcation Functions
+***************************************************************************/
 
 /* Reads an 8-bit unsigned integer from the MS5607 */
 uint8_t Melon_MS5607::read8(uint8_t reg){
