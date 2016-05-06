@@ -33,9 +33,9 @@ Melon_MS5607::Melon_MS5607(void){
 /* Set the i2c address, reset the chip, and read the calibration values from PROM */
 bool Melon_MS5607::begin(uint8_t addr)
 {
-    this->_i2caddr = addr;
-
     Wire.begin();
+
+    this->_i2caddr = addr;
 
     // Send a software reset, per datasheet
     this->reset();
@@ -55,9 +55,9 @@ bool Melon_MS5607::begin(uint8_t addr)
     return true;
 }
 
-/* Get the compensated temperature as a floating point value, in °C */
+/* Get the compensated temperature as a floating point value, in ï¿½C */
 int32_t Melon_MS5607::getTemperature(){
-    return TEMP;            // TEMP is a fixed-point int - 2000 = 20.00°C
+    return TEMP;            // TEMP is a fixed-point int - 2000 = 20.00ï¿½C
 }
 
 /* Get the compensated pressure as a floating point value, in mbar */
@@ -153,7 +153,7 @@ bool Melon_MS5607::readTemperature(){
         D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
         // Compensate for calibration data
         dT = D2 - ((uint32_t)_calibData.C5 << 8);                    // D2 - T_ref
-        TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00°C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
+        TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00ï¿½C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
         return true;
     }
     else
@@ -167,7 +167,7 @@ bool Melon_MS5607::readPressure(){
         SENS = ((int64_t)_calibData.C1 << 16) + ((dT * _calibData.C3) >> 7);  // SENS = SENS_t1 + TCS * dT or SENS = C1 * 2^16 + (C3 * dT) / 2^7
 
         compensateSecondOrder();
-        P = ((int64_t)D1 * (SENS >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
+        P = (((D1 * SENS) >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
         return true;
     }
     else
