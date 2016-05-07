@@ -31,11 +31,11 @@ MIT License
 // Oversampling rates
 typedef enum
 {
-    MS5607_OSR256   = 0x00,
-    MS5607_OSR512   = 0x02,
-    MS5607_OSR1024  = 0x04,
-    MS5607_OSR2048  = 0x06,
-    MS5607_OSR4096  = 0x08
+    MS5607_OSR256   = 0x00, // 750  uS
+    MS5607_OSR512   = 0x02, // 1250 uS
+    MS5607_OSR1024  = 0x04, // 2500 uS
+    MS5607_OSR2048  = 0x06, // 4750 uS
+    MS5607_OSR4096  = 0x08  // 9250 uS
 } ms5607_osr;
 
 class Melon_MS5607
@@ -55,6 +55,8 @@ public:
 
     bool readTemperature();
     bool readPressure();
+
+    void getPressureBlocking();
 
 private:
 

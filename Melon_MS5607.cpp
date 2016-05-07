@@ -44,6 +44,7 @@ bool Melon_MS5607::begin(uint8_t addr)
     delay(20);
 
     this->getCalibrationData(_calibData);
+    
     setDelay();
     _lastConversion = 0;
 
@@ -55,14 +56,54 @@ bool Melon_MS5607::begin(uint8_t addr)
     return true;
 }
 
-/* Get the compensated temperature as a floating point value, in ï¿½C */
+/* Get the compensated temperature as a floating point value, in °C */
 int32_t Melon_MS5607::getTemperature(){
-    return TEMP;            // TEMP is a fixed-point int - 2000 = 20.00ï¿½C
+    return TEMP;            // TEMP is a fixed-point int - 2000 = 20.00°C
 }
 
 /* Get the compensated pressure as a floating point value, in mbar */
 int32_t Melon_MS5607::getPressure(){  
     return P;
+}
+
+void Melon_MS5607::getPressureBlocking(){
+    write8(MS5607_CONVERT_D2 + _oversamplingRate);              // Start a temperature conversion
+    setDelay();
+    delayMicroseconds(_osrdelay);
+ 
+    D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
+    dT = D2 - ((uint32_t)_calibData.C5*256);                    // D2 - T_ref
+
+    TEMP = 2000 + ((dT * _calibData.C6) >> 23);           // 20.00°C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
+
+    write8(MS5607_CONVERT_D1 + _oversamplingRate);
+    delayMicroseconds(_osrdelay);
+    D1 = read24(MS5607_ADC_READ);                           // Read and store the Digital pressure value
+
+    OFF = (((int64_t)_calibData.C2) << 17) + ((dT * (int64_t)_calibData.C4) >> 6);    // OFF = OFF_t1 + TCO * dT  or  OFF = C2 * 2^17 + (C4 * dT) / 2^6
+    SENS = ((int64_t)_calibData.C1 << 16) + ((dT * (int64_t)_calibData.C3) >> 7);  // SENS = SENS_t1 + TCS * dT or SENS = C1 * 2^16 + (C3 * dT) / 2^7
+
+    int32_t T2 = 0;
+    int64_t OFF2 = 0;
+    int64_t SENS2 = 0;
+
+    // Low Temperature
+    if (TEMP < 2000){
+        T2 = ((dT * dT) >> 31);                       // T2 = dT^2 / 2^31
+        OFF2 = 61 * (TEMP - 2000)*(TEMP - 2000) >> 4;       // OFF2 = 61 * (TEMP-2000)^2 / 2^4
+        SENS2 = 2 * (TEMP - 2000)*(TEMP - 2000);            // SENS2 = 2 * (TEMP-2000)^2
+
+        // Very Low Temperature
+        if (TEMP < -1500) {
+            OFF2 += 15 * (TEMP + 1500)*(TEMP + 1500);       // OFF2 = OFF2 + 15 * (TEMP + 1500)^2
+            SENS2 += 8 * (TEMP + 1500)*(TEMP + 1500);       // SENS2 = SENS2 + 8 * (TEMP + 1500)^2
+        }
+        TEMP = TEMP - T2;
+        OFF = OFF - OFF2;
+        SENS = SENS - SENS2;
+    }
+
+    P = (((D1 * SENS) >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
 }
 
 bool Melon_MS5607::startTemperatureConversion(){
@@ -153,7 +194,7 @@ bool Melon_MS5607::readTemperature(){
         D2 = read24(MS5607_ADC_READ);                           // Read and store the Digital temperature value
         // Compensate for calibration data
         dT = D2 - ((uint32_t)_calibData.C5 << 8);                    // D2 - T_ref
-        TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00ï¿½C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
+        TEMP = 2000 + ((dT*(int64_t)_calibData.C6) >> 23);           // 20.00°C + dT * TEMPSENS or 2000 + dT * C6 / 2^23
         return true;
     }
     else
