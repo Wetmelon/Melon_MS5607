@@ -47,12 +47,6 @@ bool Melon_MS5607::begin(uint8_t addr)
     
     setDelay();
     _lastConversion = 0;
-
-    startTemperatureConversion();
-    delayMicroseconds(_osrdelay);
-
-    startPressureConversion();
-    delayMicroseconds(_osrdelay);
     return true;
 }
 
@@ -104,26 +98,19 @@ void Melon_MS5607::getPressureBlocking(){
     }
 
     P = (((D1 * SENS) >> 21) - OFF) >> 15;              // P = (D1 * SENS / 2^21 - OFF) / 2^15
+    _lastConversion = micros();
 }
 
 bool Melon_MS5607::startTemperatureConversion(){
-    if (micros() - _lastConversion > _osrdelay){
         write8(MS5607_CONVERT_D2 + _oversamplingRate);          // Start a temperature conversion with the specified oversampling rate
-        setDelay();
         _lastConversion = micros();
         return true;
-    }
-    return false;
 }
 
 bool Melon_MS5607::startPressureConversion(){
-    if (micros() - _lastConversion > _osrdelay){
         write8(MS5607_CONVERT_D1 + _oversamplingRate);          // Start a pressure conversion with the speciifed oversampling rate
-        setDelay();
         _lastConversion = micros();
         return true;
-    }
-    return false;
 }
 
 void Melon_MS5607::setOversamplingRate(uint8_t rate){
